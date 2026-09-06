@@ -20,6 +20,7 @@ class Signin extends React.Component {
 
     onSubmitSignIn = () => {
       const { signInEmail, signInPassword } = this.state;
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
       if (!signInEmail || !signInPassword) {
         return this.setState({ errorMessage: 'Please fill in both email and password fields.' });
@@ -27,7 +28,7 @@ class Signin extends React.Component {
 
       this.setState({ isLoading: true, errorMessage: '' });
 
-      fetch('https://smartbrain-api-tthq.onrender.com/signin', {
+      fetch(`${API_URL}/signin`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({

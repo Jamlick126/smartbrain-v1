@@ -25,6 +25,7 @@ class Register extends React.Component {
 
     onSubmitSignIn = () => {
       const { email, password, name } = this.state;
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
     // Client-side validation
       if (!email || !password || !name) {
@@ -33,7 +34,7 @@ class Register extends React.Component {
 
       this.setState({ isLoading: true, errorMessage: '' });  
     
-      fetch('https://smartbrain-api-tthq.onrender.com/register', {
+      fetch(`${API_URL}/register`, {
         method: 'post',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({

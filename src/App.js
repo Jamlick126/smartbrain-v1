@@ -69,12 +69,13 @@ class App extends Component {
   }
 
   onButtonSubmit = () => {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
     if (!this.state.input) {
       return this.setState({ detectionError: 'Please enter a valid image URL.' });
     }
     this.setState({imageUrl: this.state.input, isDetecting: true, detectionError: '', box: {}});
 
-    fetch('https://smartbrain-api-tthq.onrender.com/clarifai', {
+    fetch(`${API_URL}/clarifai`, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
@@ -84,7 +85,7 @@ class App extends Component {
     .then(response => response.json())
     .then(response => {
       if (response && response.faces && response.faces.length > 0 ) {
-        fetch('https://smartbrain-api-tthq.onrender.com/image', {
+        fetch(`${API_URL}/image`, {
           method: 'put',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
