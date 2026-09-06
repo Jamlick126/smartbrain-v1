@@ -19,6 +19,8 @@ class App extends Component {
       box:{},
       route: 'signin',
       isSignedIn: false,
+      isDetecting: false,
+      detectionError: '',
       user: {
         id: '',
         name: '',
@@ -67,7 +69,10 @@ class App extends Component {
   }
 
   onButtonSubmit = () => {
-    this.setState({imageUrl: this.state.input});
+    if (!this.state.input) {
+      return this.setState({ detectionError: 'Please enter a valid image URL.' });
+    }
+    this.setState({imageUrl: this.state.input, isDetecting: true, detectionError: '', box: {}});
 
     fetch('http://localhost:3000/clarifai', {
         method: 'POST',
@@ -78,7 +83,6 @@ class App extends Component {
     })
     .then(response => response.json())
     .then(response => {
-      console.log('Hi', response)
       if (response && response.faces && response.faces.length > 0 ) {
         fetch('http://localhost:3000/image', {
           method: 'put',
@@ -89,14 +93,25 @@ class App extends Component {
         })
         .then(response => response.json())
         .then(count => {
-          this.setState(Object.assign(this.state.user,
-              {entries: count} ))
+          this.setState(prevState => ({
+            user: {
+              ...prevState.user,
+              entries: typeof count === 'object' ? (count.entries || count[0]?.entries || count[0]) : count
+            }
+          }));
         })
-        .catch(err => console.log('Error updating entries:', err));
+        .catch(err => {
+          console.log('Error updating entries:', err);
+          this.setState({ isDetecting: false });
+        });
+
         this.displayFaceBox(this.calculateFaceLocation(response));
       } 
     })
-    .catch(error => console.log('No faces detected or unexpected API response', error));
+    .catch(error => {
+      console.log('No faces detected or unexpected API response', error);
+      this.setState({ detectionError: 'No faces detected or unexpected API response.', isDetecting: false });
+    });
   }
 
   onRouteChange = (route) => {

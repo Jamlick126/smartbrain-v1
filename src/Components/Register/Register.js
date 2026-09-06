@@ -6,47 +6,75 @@ class Register extends React.Component {
         this.state = {
             email: '',
             password: '',
-            name: ''
+            name: '',
+            errorMessage: '',
+            isLoading: false
         };  
     }
     onNameChange = (event) => {
-        this.setState({name: event.target.value})
+        this.setState({name: event.target.value, errorMessage: ''})
     }
 
     onEmailChange = (event) => {
-        this.setState({email: event.target.value})
+        this.setState({email: event.target.value, errorMessage: ''})
     }
 
     onPasswordChange = (event) => {
-        this.setState({password: event.target.value})
+        this.setState({password: event.target.value, errorMessage: ''})
     }
 
     onSubmitSignIn = () => {
+      const { email, password, name } = this.state;
+
+    // Client-side validation
+      if (!email || !password || !name) {
+      return this.setState({ errorMessage: 'Incorrect form submission. Please fill in all fields.' });
+      }
+
+      this.setState({ isLoading: true, errorMessage: '' });  
+    
       fetch('http://localhost:3000/register', {
         method: 'post',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          email: this.state.email,
-          password: this.state.password,
-          name: this.state.name
+          email: email,
+          password: password,
+          name: name
         })
       })
-        .then(response => response.json())
+        .then(response => {
+            if (response.ok) return response.json();
+            throw new Error('Unable to register. Email may already be in use.');
+        })
         .then(user => {
-            if (user) {
+            if (user.id) {
                 this.props.loadUser(user);
                 this.props.onRouteChange('home');
             }
         })
+        .catch(err => {
+            this.setState({ errorMessage: err.message, isLoading: false });
+        });
+            
     }
 
     render() {
+        const { errorMessage, isLoading } = this.state;
+
          return (
             <article className="br3 ba b--black-10 mv4 w-100 w-50-m w-25-l mw6 shadow-5 center">
                 <main className="pa4 black-80">
                 <div className="measure">
                     <fieldset id="sign_up" className="ba b--transparent ph0 mh0">
                     <legend className="f1 fw6 ph0 mh0">Register</legend>
+
+                    {/* Error Banner */}
+                    {errorMessage && (
+                        <div className="bg-washed-red red pa2 mb3 br2 ba b--red f6">
+                        {errorMessage}
+                        </div>
+                    )}
+
                     <div className="mt3">
                         <label className="db fw6 lh-copy f6" htmlFor="name">Name</label>
                         <input 
@@ -74,7 +102,8 @@ class Register extends React.Component {
                         onClick={this.onSubmitSignIn}
                         className="b ph3 pv2 input-reset ba b--black bg-transparent grow pointer f6 dib" 
                         type="submit" 
-                        value="Register"
+                        value={isLoading ? 'Registering...' : 'Register'}
+                        disabled={isLoading}
                     />
                     </div>
                 </div>
