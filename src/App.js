@@ -10,51 +10,6 @@ import FaceRecognition from "./Components/FaceRecognition/FaceRecognition";
 
 import './App.css';
 
-const MODEL_ID = 'face-detection';
-const MODEL_VERSION_ID = '6dc7e46bc9124c5c8824be4822abe105';
-
-const returnClarifaiRequestOptions = (imageUrl) => {
-
-     // Your PAT (Personal Access Token) can be found in the Account's Security section
-    const PAT = 'fcd321cdd69c413d82a77572cb26beaf';
-    // Specify the correct user_id/app_id pairings
-    const USER_ID = 'eagle-eye247';       
-    const APP_ID = 'smart-brain';
-    // Change these to whatever model and image URL you want to use
-       
-    const IMAGE_URL = imageUrl;
-
-    ///////////////////////////////////////////////////////////////////////////////////
-    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
-    ///////////////////////////////////////////////////////////////////////////////////
-
-    const raw = JSON.stringify({
-        "user_app_id": {
-            "user_id": USER_ID,
-            "app_id": APP_ID
-        },
-        "inputs": [
-            {
-                "data": {
-                    "image": {
-                        "url": IMAGE_URL
-                    }
-                }
-            }
-        ]
-    });
-
-    return {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Key ' + PAT
-        },
-        body: raw
-    };
-
-}
-
 class App extends Component {
   constructor() {
     super();
@@ -64,25 +19,44 @@ class App extends Component {
       box:{},
       route: 'signin',
       isSignedIn: false,
+      isDetecting: false,
+      detectionError: '',
       user: {
         id: '',
         name: '',
         email: '',
-        entries: 0
+        entries: 0,
+        joined: ''
       }
     }
   }
 
+  loadUser = (data) => {
+    this.setState({user: {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      entries: data.entries,
+      joined: data.joined
+    }});
+  }
+
   calculateFaceLocation = (data) => {
-    const clarifaiFace = data.outputs[0].data.regions[0].region_info.bounding_box;
+    const faceRectangle = data.faces[0].face_rectangle;
     const image = document.getElementById('inputimage');
-    const width = Number(image.width);
-    const height = Number(image.height);
+    const displayWidth = Number(image.width);
+    const displayHeight = Number(image.height);
+    const naturalWidth = Number(image.naturalWidth);
+    const naturalHeight = Number(image.naturalHeight);
+
+    const scaleX = displayWidth / naturalWidth;
+    const scaleY = displayHeight / naturalHeight;
+
     return {
-      leftCol: clarifaiFace.left_col * width,
-      topRow: clarifaiFace.top_row * height,
-      rightCol: width - (clarifaiFace.right_col * width),
-      bottomRow: height - (clarifaiFace.bottom_row * height)
+        leftCol: faceRectangle.left * scaleX,
+        topRow: faceRectangle.top * scaleY,
+        rightCol: displayWidth - (faceRectangle.left + faceRectangle.width) * scaleX,
+        bottomRow: displayHeight - (faceRectangle.top + faceRectangle.height) * scaleY
     }
   }
 
@@ -95,36 +69,50 @@ class App extends Component {
   }
 
   onButtonSubmit = () => {
-    this.setState({imageUrl: this.state.input});
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    if (!this.state.input) {
+      return this.setState({ detectionError: 'Please enter a valid image URL.' });
+    }
+    this.setState({imageUrl: this.state.input, isDetecting: true, detectionError: '', box: {}});
 
-    // NOTE: MODEL_VERSION_ID is optional, you can also call prediction with the MODEL_ID only
-    // https://api.clarifai.com/v2/models/{YOUR_MODEL_ID}/outputs
-    // this will default to the latest version_id
+    fetch(`${API_URL}/clarifai`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          imageUrl: this.state.input
+        })
+    })
+    .then(response => response.json())
+    .then(response => {
+      if (response && response.faces && response.faces.length > 0 ) {
+        fetch(`${API_URL}/image`, {
+          method: 'put',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            id: this.state.user.id
+          })
+        })
+        .then(response => response.json())
+        .then(count => {
+          this.setState(prevState => ({
+            user: {
+              ...prevState.user,
+              entries: typeof count === 'object' ? (count.entries || count[0]?.entries || count[0]) : count
+            }
+          }));
+        })
+        .catch(err => {
+          console.log('Error updating entries:', err);
+          this.setState({ isDetecting: false });
+        });
 
-    fetch("https://api.clarifai.com/v2/models/" + 
-      MODEL_ID + "/versions/" + MODEL_VERSION_ID +
-      "/outputs", returnClarifaiRequestOptions(this.state.input))
-        .then(response => response.json()) // Change to response.json() to parse JSON
-        .then(response => {
-          console.log('Hi', response)
-          if (response && response.outputs && response.outputs[0].data.regions) {
-            fetch('http://localhost:3000/image', {
-              method: 'put',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({
-                id: this.state.user.id
-              })
-            })
-            .then(response => response.json())
-            .then(count => {
-              this.setState(Object.assign(this.state.user,
-                 {entries: count} ))
-            })
-            //.catch(console.log);
-           .catch(err => console.log('Error updating entries:', err));
-           this.displayFaceBox(this.calculateFaceLocation(response));
-          } 
-        })//.catch(error => console.log('No faces detected or unexpected API response', error));
+        this.displayFaceBox(this.calculateFaceLocation(response));
+      } 
+    })
+    .catch(error => {
+      console.log('No faces detected or unexpected API response', error);
+      this.setState({ detectionError: 'No faces detected or unexpected API response.', isDetecting: false });
+    });
   }
 
   onRouteChange = (route) => {
@@ -147,14 +135,14 @@ class App extends Component {
         { route === 'home'
          ? <div>
             <Logo />
-            <Rank />
+            <Rank name={this.state.user.name} entries={this.state.user.entries}/>
             <ImageLinkForm onInputChange={this.onInputChange} onButtonSubmit={this.onButtonSubmit} />     
             <FaceRecognition box={box} imageUrl={imageUrl} />
          </div>
          : (
           route === 'signin' ?
-          <Signin onRouteChange={this.onRouteChange} /> :
-          <Register onRouteChange={this.onRouteChange} />
+          <Signin loadUser={this.loadUser} onRouteChange={this.onRouteChange} /> :
+          <Register loadUser={this.loadUser} onRouteChange={this.onRouteChange} />
 
          )
 
