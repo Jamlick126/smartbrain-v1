@@ -74,7 +74,7 @@ class App extends Component {
     }
     this.setState({imageUrl: this.state.input, isDetecting: true, detectionError: '', box: {}});
 
-    fetch('http://localhost:3000/clarifai', {
+    fetch('https://smartbrain-api-tthq.onrender.com/clarifai', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
@@ -84,7 +84,7 @@ class App extends Component {
     .then(response => response.json())
     .then(response => {
       if (response && response.faces && response.faces.length > 0 ) {
-        fetch('http://localhost:3000/image', {
+        fetch('https://smartbrain-api-tthq.onrender.com/image', {
           method: 'put',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
